@@ -1,0 +1,525 @@
+# Tulos ei päivity vielä oikein eikä sitä muistta nollata missään vaiheessa
+# onkohan kirjaimen syöttö pakko ola omana vaiheenaan vai voisiko sen sisällyttää
+# plus/minuus... vaiheiden adapteriin?
+
+
+language "python" {
+    # coding: utf-8
+
+    import os
+    import random
+    from time import sleep
+
+    NAYTTO_ID = ":177351"
+    ODOTUSAIKA = 0.3    # laskin 0,5
+
+    random.seed()
+
+    def tuota_luku():
+        if random.choice((True, False)): 
+            return random.randint(-99, 99)
+        else:
+            return 0.01 * random.randint(-9999, 9999)
+
+
+    def tarkistaValitulos ( valitulos ):
+        loyty = False
+        txtValitulos = str(valitulos)
+        # jos ei ole pilkkua kasitellaan inttina
+        if isinstance(valitulos, int):
+            print "\n        Valitulos INT " + txtValitulos
+            loyty = s.verifyOcrText( txtValitulos , match = 0.2, area = (0, 25, 400, 80))
+        
+        # float kokonaisluku esim. 12.0
+        elif isinstance(valitulos, float):
+            txtValitulos = txtValitulos            
+            if txtValitulos.endswith( "0" ) and txtValitulos[ len( txtValitulos ) - 2 ] == ".":
+                txtValitulos = txtValitulos.replace( ".", "," )
+                txtValitulos = str( int( valitulos ) )
+                print "Valitulos KF   " + txtValitulos
+                loyty = s.verifyOcrText( txtValitulos , match = 0.2, area = (0, 25, 400, 80) )
+        
+            # muuten oltava normi floatti esim. 12.12345 
+            else:
+                print "Valitulos FLOAT   " + txtValitulos
+                loyty = s.verifyOcrText( txtValitulos, match = 0.2, area = (0, 25, 400, 80) )
+                               
+        if not loyty:
+            print "\n        EI LOYTYNYT !!!!!\n"
+            eiLoytynyt.append( str( valitulos ) )
+        else:
+            print "\n        loytyi " + txtValitulos + "\n"
+            loytyi.append( str( valitulos ) )
+
+
+}
+
+# preview-show-vars:
+# preview-depth: 4
+
+variables {
+    loytyi, eiLoytynyt,operaatioValittu, lukuSyotetty, tulos, valitulos, tallTulos, syotLuku, syotLukuTxt, edelLuku, operaatio, edelOperaatio, tallOperaatio, kierros, lukuTaulukko, kierros, operaatioNro, eilukuTaulukko, laskut, valitulokset, lasku
+}
+
+initial_state {
+    loytyi = []
+    eiLoytynyt = []
+    lukuSyotetty = False
+    operaatioValittu = False
+    tulos = 0
+    valitulos = 0
+    tallTulos = 0
+    syotLuku = 0.0
+    syotLukuTxt = ""
+    edelLuku = 0
+    operaatio = ""
+    edelOperaatio = ""
+    tallOperaatio = ""
+    kierros = 0
+    lukuTaulukko = 10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0, 110.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0,19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0, 0.29, 0.30, 0,31.0, 32.0, 33.0, 34.0, 35.0, 36.0, 37.0, 38.0, 39.0, 40.0, 41.0, 42.0, 43.0, 44.0, 45.0,46.0, 47.0,48.0,49.0,50.0,51.0,52.0
+    eilukuTaulukko = 0,1,2,3,4,5,6,7,8,9,-1,-2,-3,-4,-5,-6,-7,-8,-9
+    operaatioNro = 0
+    laskut = ""
+    valitulokset = ""
+    lasku = ""
+}
+
+
+adapter_init {
+    import fmbtx11
+
+    # poistetaan vanhat screenshotit
+    #os.system("rm /home/tommi/Documents/Testaus_H3/screenshots/*")
+    
+    # HUOM !!! itsemuokattu sopimaan omalle koneelle !!!!
+    os.system("Xephyr -screen 800/220x900/180 " + NAYTTO_ID + " &")
+    sleep(2)
+    os.system("env DISPLAY=" + NAYTTO_ID + "  galculator &")
+    sleep(2)
+
+    global s
+    s = fmbtx11.Screen(NAYTTO_ID)
+    s.setBitmapPath("kuvat")
+    #s.setScreenshotArchiveMethod("remove")
+    #s.setScreenshotLimit(10)
+
+    s.refreshScreenshot()
+}
+
+adapter_exit {
+    print laskut
+    print ""
+    print valitulokset
+    s.close()
+}
+
+tag "Luku syottamatta" {
+    input "Syota luku" {
+        guard() { return not lukuSyotetty }
+        adapter() {
+            syotLuku = -1
+            
+            #ei syoteta lukuja joita ocr ei tunnista
+            jatketaanEtsimista = True
+            while (jatketaanEtsimista):
+                syotLuku = tuota_luku()
+                jatketaanEtsimista = False
+                if syotLuku in eilukuTaulukko:
+                    jatketaanEtsimista = True;
+                if str(syotLuku).find("8") >= 0:
+                    jatketaanEtsimista = True
+           #syotLuku = lukuTaulukko[kierros] #tuota_luku()
+            kierros += 1
+
+            laskut += " " + str(syotLuku)
+            lasku += str(syotLuku)
+
+            # Muotoillaan syotetty luku laskimelle sopivaksi merkkijonoksi
+            syotLukuTxt = str(syotLuku)
+            if syotLukuTxt.find(".") == -1:
+                syotLukuTxt = syotLukuTxt.replace(".", ",")
+
+            # MUOTOILLAAN SYOTETTYLUKU LASKIMELLESOPIVAKSI
+            syotLukuTxt = str(syotLuku)
+            if syotLukuTxt.find(".") == -1:
+                syotLukuTxt = syotLukuTxt.replace(".", ",")
+
+            # syotetaan - ja + merkkiset luvut erilailla laskimelle
+            if syotLukuTxt.find("-") >= 0:
+                eiMiinusta = syotLukuTxt.translate(None, '-')
+                syotLukuTxt = eiMiinusta
+                
+                x = 0
+                while ( x < len(syotLukuTxt) ):
+                    s.type(syotLukuTxt[x])
+                    x=x+1
+                    sleep(ODOTUSAIKA)
+
+                s.refreshScreenshot()
+                s.tapBitmap("plus_miinus.png", colorMatch = 0.70)
+                sleep(ODOTUSAIKA)
+                s.refreshScreenshot()
+            else:
+                x = 0
+                while ( x < len(syotLukuTxt) ):
+                    s.type(syotLukuTxt[x])
+                    x=x+1
+                    sleep(ODOTUSAIKA)
+                
+                s.refreshScreenshot()
+
+
+            print " valitulos " + str(valitulos)
+            print " tulos " + str(tulos) + "\n"
+            print " syotetty " + str(syotLuku)
+            print " edellinen " + str(edelLuku)
+            print " operaatio " + operaatio
+            print " edellinen operaatio " + edelOperaatio
+            print "\n"
+            
+
+            # LASKETAAN LASKUT
+            if operaatio == "":
+                tulos = valitulos = syotLuku
+                valitulokset += " " + str(valitulos)
+
+            if operaatio == "plus":
+                if edelOperaatio in ["jako","kerto"]:
+                    if tallOperaatio == "plus":
+                        tulos = tallTulos + valitulos + syotLuku
+                        valitulos = tulos
+                        valitulokset += " " + str(valitulos)
+                    elif tallOperaatio == "miinus":
+                        tulos = tallTulos - valitulos + syotLuku   # 6 - 20/6+2
+                        valitulos = tulos   # 6-20/6
+                        valitulokset += " " + str(valitulos)
+                else:
+                    tulos = tulos + syotLuku
+                    valitulos = tulos
+                    valitulokset += " " + str(valitulos)
+
+            if operaatio == "miinus":
+                if edelOperaatio in ["jako","kerto"]:
+                    if tallOperaatio == "plus":
+                        tulos = tallTulos + valitulos
+                        valitulos = tulos
+                        valitulokset += " " + str(valitulos)
+                    elif tallOperaatio == "miinus":
+                        tulos = tallTulos - valitulos
+                        valitulos = tulos 
+                        valitulokset += " " + str(valitulos)
+                else:
+                    tulos = tulos - syotLuku
+                    valitulos = tulos
+                    valitulokset += " " + str(valitulos)
+
+            # operaation vaihtuessa +- -> */ kumotaan edellinen laskuttoimitus
+            if operaatio == "kerto": 
+                if edelOperaatio in ["kerto", "jako"]:
+                    if tallOperaatio == "plus":
+                        tulos = tallTulos + valitulos * syotLuku
+                        valitulos = valitulos * syotLuku
+                        valitulokset += " " + str(valitulos)
+                    elif tallOperaatio == "miinus":
+                        tulos = tallTulos - valitulos * syotLuku
+                        valitulos = valitulos * syotLuku
+                        valitulokset += " " + str(valitulos)
+                elif edelOperaatio == "miinus":
+                    tallTulos = tulos + edelLuku    # 6 + 4
+                    tulos = tulos + edelLuku - edelLuku * syotLuku  # 6+4-4/5
+                    valitulos = edelLuku * syotLuku # 20
+                    tallOperaatio = edelOperaatio   # -
+                    valitulokset += " " + str(edelLuku)    # 4 koska */ pysayttaa laskemisen 
+                elif edelOperaatio == "plus":
+                    tallTulos = tulos - edelLuku
+                    tulos = tulos - edelLuku + edelLuku * syotLuku
+                    valitulos = edelLuku * syotLuku
+                    tallOperaatio = edelOperaatio
+                    valitulokset += " " + str(edelLuku)
+                else:
+                    tulos = tulos * syotLuku
+                    valitulos = tulos   # lisatty 5.12 17:32
+                    valitulokset += " " + str(valitulos)
+
+            # operaation vaihtuessa +- -> */ kumotaan edellinen laskuttoimitus
+            if operaatio == "jako": 
+                if edelOperaatio in ["kerto", "jako"]:
+                    if tallOperaatio == "plus": 
+                        tulos = tallTulos + valitulos / syotLuku #6+20/6
+                        valitulos = valitulos / syotLuku
+                        valitulokset += " " + str(valitulos)
+                    elif tallOperaatio == "miinus":
+                        tulos = tallTulos - valitulos / syotLuku    # 6-20/6
+                        valitulos = valitulos / syotLuku    # 20/6
+                        valitulokset += " " + str(valitulos)
+                elif edelOperaatio == "miinus":
+                    tallTulos = tulos + edelLuku
+                    tulos = tulos + edelLuku - edelLuku / syotLuku
+                    valitulos = edelLuku
+                    tallOperaatio = edelOperaatio
+                    valitulokset += " " + str(edelLuku) # koska */ pysayttaa laskun etenemisen
+                elif edelOperaatio == "plus":
+                    tallTulos = tulos - edelLuku
+                    tulos = tulos - edelLuku + edelLuku / syotLuku
+                    valitulos = edelLuku / syotLuku
+                    tallOperaatio = edelOperaatio
+                    valitulokset += " " + str(edelLuku) # koska */ pysayttaa laskun etenemisen
+                else:
+                    tulos = tulos / syotLuku
+                    valitulos = tulos   # lisatty 5.12 17:32
+                    valitulokset += " " + str(valitulos)
+
+            edelLuku = syotLuku
+            edelOperaatio = operaatio
+
+
+            print " tulos " + str(tulos)
+            print " valitulos " + str(valitulos)
+            print " tallOPer " + tallOperaatio
+            print " tallTulos " + str(tallTulos)
+
+            
+
+
+            # TALLENNETTAAN TUNNISTAMATTOMAT LUVUT TIEDOSTO
+            if kierros%3 == 0:
+                tiedosto = open("kylla2.txt", "ab")
+                x = 0
+                while x < len(loytyi):
+                    tiedosto.write( loytyi[x] + "\n" )
+                    x = x+1
+                tiedosto.close()
+                
+                tiedosto = open("ei2.txt", "ab")
+                       
+                x = 0
+                while x < len(eiLoytynyt):
+                    tiedosto.write(  eiLoytynyt[x] + ", " )
+                    x = x+1
+                
+                tiedosto.close()
+                loytyi[:] = []
+                eiLoytynyt[:] = []
+        }
+        body() {
+
+            lukuSyotetty = True
+
+            # siivotaan muuttujat
+            syotLukuTxt = ""
+            syotLuku = 0
+        }
+    }
+}
+
+##########################################
+tag "Lukusyotetty" {
+    guard() { return lukuSyotetty and not operaatioValittu } # lisasin notin 
+    adapter() {
+        # tarkastetaan että tiedosto on tallentamatta
+    }
+
+    input "plus" {
+        guard() { return not operaatioValittu }
+        adapter() {
+            s.type("+")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " + "
+            tarkistaValitulos(valitulos)            
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "plus"
+            laskut += " +"
+        }
+    }
+
+    input "miinus" {
+        guard() { return not operaatioValittu }
+        adapter() {
+            s.type("-")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " - "
+            if edelOperaatio in ["tulo", "kerto"]:
+                tarkistaValitulos(tulos)
+            else:
+                tarkistaValitulos(valitulos)
+            
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "miinus"
+            laskut += " -"
+        }
+    }
+
+    input "kerto" {
+        guard() { return not operaatioValittu }
+        adapter() {
+            s.type("*")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " * "
+            if edelOperaatio in ["jako", "kerto"]:
+                tarkistaValitulos(valitulos)
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "kerto"
+            laskut += " *"
+        }
+    }
+
+    input "jako" {
+        guard() { return not operaatioValittu }
+        adapter() {
+            s.type("/")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " / "
+            if edelOperaatio in ["jako", "kerto"]:
+                tarkistaValitulos(valitulos)
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "jako"
+            laskut += " /"
+        }
+    }
+}
+
+tag "N operaation valinta" {
+    guard() { return lukuSyotetty and operaatioValittu }
+    adapter() {
+        # tarkastetaan että tiedosto on tallentamatta
+    }
+    input "n plus" {
+        guard() { return True }
+        adapter() {
+            s.type("+")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " + "
+            if edelOperaatio in ["kerto", "jako"]:
+                tarkistaValitulos(tulos)
+            else:
+                tarkistaValitulos(valitulos)
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "plus"
+            laskut += " +"
+        }
+    }
+
+    input "n miinus" {
+        guard() { return True }
+        adapter() {
+            s.type("-")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " - "
+            if edelOperaatio in ["kerto", "jako"]:
+                tarkistaValitulos(tulos)
+            else:
+                tarkistaValitulos(valitulos)
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "miinus"
+            laskut += " -"
+        }
+    }
+
+    input "n kerto" {
+        guard() { return True }
+        adapter() {
+            s.type("*")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " * "
+            if edelOperaatio in ["jako", "kerto"]:
+                tarkistaValitulos(valitulos) 
+            else:
+                tarkistaValitulos(edelLuku) # 4, koska +/ pysayttaa laskemisen
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "kerto"
+            laskut += " *"
+        }
+    }
+
+    input "n jako" {
+        guard() { return True }
+        adapter() {
+            s.type("/")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            lasku += " / "
+            if edelOperaatio in ["jako", "kerto"]:
+                tarkistaValitulos(valitulos)
+            else:
+                tarkistaValitulos(edelLuku) # koska +/ pysayttaa laskemisen
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = True
+            operaatio = "jako"
+            laskut += " /"
+        }
+    }
+
+    input "tulos" {
+        guard() { return True }
+        adapter() {
+            s.type("=")
+            sleep(ODOTUSAIKA)
+            s.refreshScreenshot()
+            sleep(ODOTUSAIKA)
+
+            tarkistaValitulos(tulos)
+            #haettavaTeksti = str(tulos).replace(".", ",")
+            #haettavaTeksti2 = str(int(tulos)).replace(".", ",")
+
+            #tulosTxt = str(tulos).replace(".", ",")
+
+            #if s.verifyOcrText( str(haettavaTeksti), match=0.2, area=(0,25,400,80)  ):
+            #     print "        LOYTY " + haettavaTeksti + " \n"
+            #    loytyi.append(haettavaTeksti)
+            #elif s.verifyOcrText( str(haettavaTeksti2), match=0.2, area=(0,25,400,80) ):
+            #    print "        LOYTY2 \n"
+            #    loytyi.append(haettavaTeksti2)
+            #else:
+            #    print "        EI LOYTYNYT" + haettavaTeksti2 +  " \n" + str(tulos).replace(".", ",") + " TAI " + str( int(tulos) ).replace(".", ",")
+            #    eiLoytynyt.append(haettavaTeksti2)
+            laskut += " = " + str(tulos) + "\n"
+            valitulokset += "\n"
+            print "EVAL " + str( eval(lasku) )
+
+        }
+        body() {
+            lukuSyotetty = False
+            operaatioValittu = False
+            tulos = 0.0
+            valitulos = 0.0
+            syotLuku = 0.0
+            edelLuku = 0.0
+            operaatio = ""
+            edelOperaatio = ""
+            tallOperaatio = ""
+            tallTulos = 0.0
+            lasku = ""
+        }
+    }
+}
+
