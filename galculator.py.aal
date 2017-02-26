@@ -284,7 +284,7 @@ tag "Luku syottamatta" {
             
 
 
-            # TALLENNETTAAN TUNNISTAMATTOMAT LUVUT TIEDOSTO
+            # Tallennetaan tunnistetut ja tunnistamattomat luvut teidostoon.
             if kierros%3 == 0:
                 tiedosto = open("kylla2.txt", "ab")
                 x = 0
