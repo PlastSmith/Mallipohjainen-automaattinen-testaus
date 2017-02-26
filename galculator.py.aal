@@ -10,7 +10,7 @@ language "python" {
     import random
     from time import sleep
 
-    NAYTTO_ID = ":177351"
+    NAYTTO_ID = ":1234"
     ODOTUSAIKA = 0.3    # laskin 0,5
 
     random.seed()
@@ -92,7 +92,7 @@ adapter_init {
     #os.system("rm /home/tommi/Documents/Testaus_H3/screenshots/*")
     
     # HUOM !!! itsemuokattu sopimaan omalle koneelle !!!!
-    os.system("Xephyr -screen 800/220x900/180 " + NAYTTO_ID + " &")
+    os.system("Xephyr -screen 800/220x500/180+200+200 " + NAYTTO_ID + " &")
     sleep(2)
     os.system("env DISPLAY=" + NAYTTO_ID + "  galculator &")
     sleep(2)
@@ -102,7 +102,10 @@ adapter_init {
     s.setBitmapPath("kuvat")
     #s.setScreenshotArchiveMethod("remove")
     #s.setScreenshotLimit(10)
-
+    
+    # Napautys lisatty aktivoimaan ikkuna. Ilman tata Xephy
+    # ikkuna ei nakyvasti aktivoidy ellei hiirta vie laskimen paalle.
+    s.tap((2,50))
     s.refreshScreenshot()
 }
 
